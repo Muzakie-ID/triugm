@@ -183,4 +183,84 @@ class AuthTest extends TestCase
 
         $this->assertGuest();
     }
+
+    public function test_user_can_register_and_then_activate_pin(): void
+    {
+        $this->postJson('/api/auth/register', [
+            'niu' => '55555',
+            'name' => 'Mahasiswa Baru',
+            'theory_class' => 'bb',
+            'practicum_group' => 'b2',
+        ])
+            ->assertCreated()
+            ->assertJson([
+                'status' => 'needs_activation',
+                'user' => [
+                    'niu' => '55555',
+                    'name' => 'Mahasiswa Baru',
+                    'theory_class' => 'BB',
+                    'practicum_group' => 'B2',
+                    'role' => 'STUDENT',
+                ],
+            ]);
+
+        $this->assertDatabaseHas('users', [
+            'niu' => '55555',
+            'role' => 'STUDENT',
+            'theory_class' => 'BB',
+            'practicum_group' => 'B2',
+            'is_active' => false,
+        ]);
+
+        // check-niu kini mengenali akun baru → alur aktivasi PIN
+        $this->postJson('/api/auth/check-niu', ['niu' => '55555'])
+            ->assertOk()
+            ->assertJson(['status' => 'needs_activation']);
+
+        // Aktivasi PIN → akun aktif
+        $this->postJson('/api/auth/activate', [
+            'niu' => '55555',
+            'pin' => '112233',
+            'pin_confirmation' => '112233',
+        ])->assertOk();
+
+        $this->assertTrue(User::where('niu', '55555')->first()->is_active);
+    }
+
+    public function test_register_rejects_duplicate_niu(): void
+    {
+        User::create([
+            'niu' => '55555',
+            'name' => 'Sudah Terdaftar',
+            'pin_hash' => Hash::make('123456'),
+            'role' => 'STUDENT',
+            'theory_class' => 'BB',
+            'practicum_group' => 'B1',
+            'is_active' => true,
+        ]);
+
+        $this->postJson('/api/auth/register', [
+            'niu' => '55555',
+            'name' => 'Duplikat',
+            'theory_class' => 'BB',
+            'practicum_group' => 'B2',
+        ])->assertJsonValidationErrors('niu');
+
+        $this->assertSame('Sudah Terdaftar', User::where('niu', '55555')->first()->name);
+    }
+
+    public function test_register_validates_required_fields(): void
+    {
+        $this->postJson('/api/auth/register', [])
+            ->assertJsonValidationErrors(['niu', 'name', 'theory_class', 'practicum_group']);
+
+        $this->postJson('/api/auth/register', [
+            'niu' => 'abc', // bukan angka
+            'name' => 'X',
+            'theory_class' => 'BB',
+            'practicum_group' => 'B2',
+        ])->assertJsonValidationErrors('niu');
+
+        $this->assertDatabaseCount('users', 0);
+    }
 }

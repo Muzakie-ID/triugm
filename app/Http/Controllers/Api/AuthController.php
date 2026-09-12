@@ -74,6 +74,38 @@ class AuthController extends Controller
     }
 
     /**
+     * Pendaftaran mandiri akun mahasiswa baru.
+     * Akun dibuat non-aktif (role STUDENT) → lanjut ke alur aktivasi PIN.
+     */
+    public function register(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'niu' => ['required', 'string', 'max:30', 'regex:/^[0-9]+$/', 'unique:users,niu'],
+            'name' => ['required', 'string', 'max:100'],
+            'theory_class' => ['required', 'string', 'max:10'],
+            'practicum_group' => ['required', 'string', 'max:10'],
+        ], [
+            'niu.unique' => 'NIU ini sudah terdaftar. Silakan masuk.',
+            'niu.regex' => 'NIU harus berupa angka.',
+        ]);
+
+        $user = User::create([
+            'niu' => trim($validated['niu']),
+            'name' => trim($validated['name']),
+            'role' => 'STUDENT',
+            'theory_class' => strtoupper(trim($validated['theory_class'])),
+            'practicum_group' => strtoupper(trim($validated['practicum_group'])),
+            'is_active' => false,
+        ]);
+
+        return response()->json([
+            'message' => 'Pendaftaran berhasil! Sekarang buat PIN kamu.',
+            'status' => 'needs_activation',
+            'user' => $this->userBrief($user),
+        ], 201);
+    }
+
+    /**
      * Login NIU + PIN.
      */
     public function login(Request $request): JsonResponse

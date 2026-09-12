@@ -23,6 +23,8 @@ Route::middleware('guest')->group(function () {
     Route::post('/auth/check-niu', [AuthController::class, 'checkNiu'])->name('api.auth.check-niu');
     // Aktivasi PIN pertama kali (akun baru)
     Route::post('/auth/activate', [AuthController::class, 'activatePin'])->name('api.auth.activate');
+    // Pendaftaran mandiri akun mahasiswa (role STUDENT, non-aktif sampai PIN dibuat)
+    Route::post('/auth/register', [AuthController::class, 'register'])->name('api.auth.register');
     // Login NIU + PIN
     Route::post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
 });

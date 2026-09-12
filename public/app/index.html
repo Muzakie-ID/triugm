@@ -150,6 +150,12 @@
   .foot { margin-top: auto; padding-top: 40px; font-size: 13px; color: var(--text-2); }
   .foot a { color: var(--accent); text-decoration: none; font-weight: 700; }
 
+  /* ============ STEP DAFTAR ============ */
+  .reg-row { display: flex; gap: 12px; margin-top: 16px; }
+  .reg-row .field { padding: 0 14px; font-weight: 700; }
+  select.field { appearance: none; cursor: pointer; }
+  #stepDaftar .field-block .hint { min-height: 14px; }
+
   /* ============ STEP 2: PIN ============ */
   .pin-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
   .back-btn {
@@ -324,7 +330,60 @@
     </div>
 
     <footer class="foot">
-      Lupa NIU? <a href="#">Hubungi admin akademik</a>
+      Belum punya akun? <a href="#" id="linkDaftar">Daftar di sini</a> ·
+      Lupa NIU? <a href="#">Hubungi admin</a>
+    </footer>
+  </section>
+
+  <!-- STEP 0: DAFTAR -->
+  <section class="step entering-start" id="stepDaftar" hidden>
+    <div class="pin-head">
+      <button type="button" class="back-btn" id="btnDaftarBack" aria-label="Kembali">
+        <i class="ph-bold ph-arrow-left"></i>
+      </button>
+      <h1 style="margin: 0;">Buat <em>akun</em></h1>
+    </div>
+    <p class="sub" style="margin-left: 30px;">Daftar satu kali, lalu buat PIN kamu sendiri.</p>
+
+    <div class="form-body" id="regBody">
+      <div class="field-block">
+        <label for="regNiu">NIU</label>
+        <input class="field" id="regNiu" type="text" inputmode="numeric"
+               placeholder="Contoh: 2210510042" maxlength="12" autocomplete="off" />
+        <p class="hint" id="regNiuHint">6 sampai 12 digit angka (tanpa huruf)</p>
+      </div>
+      <div class="field-block" style="margin-top: 16px;">
+        <label for="regName">Nama lengkap</label>
+        <input class="field" id="regName" type="text"
+               placeholder="Sesuai data akademik" maxlength="100" autocomplete="off" />
+        <p class="hint" id="regNameHint"></p>
+      </div>
+      <div class="reg-row">
+        <div class="field-block" style="flex: 1;">
+          <label for="regKelas">Kelas teori</label>
+          <select class="field" id="regKelas">
+            <option value="AA">AA</option>
+            <option value="BB" selected>BB</option>
+          </select>
+        </div>
+        <div class="field-block" style="flex: 1;">
+          <label for="regKloter">Kloter praktikum</label>
+          <select class="field" id="regKloter">
+            <option value="A1">A1</option>
+            <option value="A2">A2</option>
+            <option value="B1">B1</option>
+            <option value="B2" selected>B2</option>
+          </select>
+        </div>
+      </div>
+
+      <button type="button" class="cta" id="btnDaftar">
+        <span>Daftar</span><i class="ph-bold ph-arrow-right"></i>
+      </button>
+    </div>
+
+    <footer class="foot">
+      Sudah punya akun? <a href="#" id="linkMasuk">Masuk</a>
     </footer>
   </section>
 
@@ -403,7 +462,7 @@
 
   const $ = (id) => document.getElementById(id);
   const niu = $("niu"), niuWrap = $("niuWrap"), niuHint = $("niuHint");
-  const stepNiu = $("stepNiu"), stepPin = $("stepPin");
+  const stepNiu = $("stepNiu"), stepPin = $("stepPin"), stepDaftar = $("stepDaftar");
   const dots = $("dots"), pinHint = $("pinHint"), pinArea = $("pinArea");
   const keypad = $("keypad");
   const dotEls = [...dots.children];
@@ -509,7 +568,7 @@
     pinHint.textContent = state.mode === "activate"
       ? "Akun baru — buat PIN 6 digit"
       : "Masukkan 6 digit PIN";
-    switchStep(true);
+    switchStep(stepPin);
     buzz(10);
     setTimeout(openKeypad, 350); // tunggu panel transition, lalu keypad slide-up
   }
@@ -521,13 +580,13 @@
     renderDots();
     pinHint.textContent = "Masukkan 6 digit PIN";
     pinHint.classList.remove("danger");
-    setTimeout(() => switchStep(false), 250);
+    setTimeout(() => switchStep(stepNiu), 250);
     niu.focus();
   }
 
-  function switchStep(toPin) {
-    const from = toPin ? stepNiu : stepPin;
-    const to = toPin ? stepPin : stepNiu;
+  function switchStep(to) {
+    const from = [stepNiu, stepPin, stepDaftar].find((s) => s !== to && !s.hidden);
+    if (!from) { to.hidden = false; return; }
     from.classList.add("leaving");
     setTimeout(() => {
       from.hidden = true;
@@ -541,6 +600,99 @@
 
   $("btnBack").addEventListener("click", backToNiu);
   $("btnSwitch").addEventListener("click", backToNiu);
+
+  /* ---------- STEP DAFTAR ---------- */
+  const regNiu = $("regNiu"), regName = $("regName");
+  const regNiuHint = $("regNiuHint"), regNameHint = $("regNameHint");
+  const regBody = $("regBody");
+
+  $("linkDaftar").addEventListener("click", (e) => {
+    e.preventDefault();
+    switchStep(stepDaftar);
+    buzz(8);
+    setTimeout(() => regNiu.focus(), 350);
+  });
+  $("linkMasuk").addEventListener("click", (e) => {
+    e.preventDefault();
+    switchStep(stepNiu);
+    buzz(8);
+    setTimeout(() => niu.focus(), 350);
+  });
+  $("btnDaftarBack").addEventListener("click", () => switchStep(stepNiu));
+
+  regNiu.addEventListener("input", () => {
+    regNiu.value = regNiu.value.replace(/\D/g, "").slice(0, 12);
+    regNiuHint.textContent = "6 sampai 12 digit angka (tanpa huruf)";
+    regNiuHint.classList.remove("danger");
+  });
+  regName.addEventListener("input", () => {
+    regNameHint.textContent = "";
+    regNameHint.classList.remove("danger");
+  });
+  regName.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); submitDaftar(); }
+  });
+
+  function rejectReg(el, hint, msg) {
+    hint.textContent = msg;
+    hint.classList.add("danger");
+    el.classList.add("err");
+    regBody.classList.remove("shake");
+    void regBody.offsetWidth;
+    regBody.classList.add("shake");
+    el.focus();
+    buzz(40);
+  }
+
+  async function submitDaftar() {
+    if (state.phase !== "idle") return;
+    regBody.classList.remove("err");
+    const vNiu = regNiu.value.trim();
+    const vName = regName.value.trim();
+    if (vNiu.length < 6) {
+      return rejectReg(regBody, regNiuHint, "NIU minimal 6 digit angka");
+    }
+    if (vName.length < 3) {
+      return rejectReg(regBody, regNameHint, "Isi nama lengkap kamu");
+    }
+
+    const btn = $("btnDaftar");
+    state.phase = "checking-niu";
+    btn.classList.add("loading");
+    btn.innerHTML = '<i class="ph-bold ph-circle-notch"></i><span>Mendaftarkan</span>';
+
+    try {
+      const { ok, data } = await api("/api/auth/register", {
+        niu: vNiu,
+        name: vName,
+        theory_class: $("regKelas").value,
+        practicum_group: $("regKloter").value,
+      });
+      if (!ok) {
+        const msg = firstError(data);
+        if (data && data.errors && data.errors.niu) {
+          rejectReg(regBody, regNiuHint, msg);
+        } else if (data && data.errors && data.errors.name) {
+          rejectReg(regBody, regNameHint, msg);
+        } else {
+          rejectReg(regBody, regNiuHint, msg);
+        }
+        return;
+      }
+      // Sukses daftar → langsung ke pembuatan PIN (mode aktivasi)
+      regNiu.value = "";
+      regName.value = "";
+      enterPinStep(data.user, vNiu, "needs_activation");
+    } catch {
+      rejectReg(regBody, regNiuHint, "Gagal terhubung ke server. Coba lagi.");
+    } finally {
+      btn.classList.remove("loading");
+      btn.innerHTML = '<span>Daftar</span><i class="ph-bold ph-arrow-right"></i>';
+      state.phase = "idle";
+    }
+  }
+
+  $("btnDaftar").addEventListener("click", submitDaftar);
 
   /* ---------- Keypad ---------- */
   function openKeypad() {
