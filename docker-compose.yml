@@ -1,0 +1,48 @@
+﻿services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: class_schedule_app
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:80"
+    environment:
+      - APP_ENV=production
+      - APP_KEY=${APP_KEY:-}
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE:-app}
+      - DB_USERNAME=${DB_USERNAME:-app}
+      - DB_PASSWORD=${DB_PASSWORD:-app123}
+      - WAHA_BASE_URL=${WAHA_BASE_URL:-https://waha.domainkamu.com}
+      - WAHA_API_KEY=${WAHA_API_KEY:-}
+    networks:
+      - webnet
+
+  # Scheduler: jalankan reminder:schedule tiap menit (notif H-15 masuk kelas)
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: class_schedule_scheduler
+    restart: unless-stopped
+    entrypoint: ["php", "artisan", "schedule:work"]
+    environment:
+      - APP_ENV=production
+      - APP_KEY=${APP_KEY:-}
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE:-app}
+      - DB_USERNAME=${DB_USERNAME:-app}
+      - DB_PASSWORD=${DB_PASSWORD:-app123}
+      - WAHA_BASE_URL=${WAHA_BASE_URL:-https://waha.domainkamu.com}
+      - WAHA_API_KEY=${WAHA_API_KEY:-}
+    networks:
+      - webnet
+
+networks:
+  webnet:
+    external: true

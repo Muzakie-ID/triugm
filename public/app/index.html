@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Masuk | Sistem Kuliah</title>
+<link rel="preconnect" href="https://api.fontshare.com" />
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@500,700,900&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  /* ============ TOKENS ============ */
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --text: #1c1917;
+    --text-2: #79716b;
+    --line: #e7e5e4;
+    --key: #ffffff;
+    --key-active: #f0efee;
+    --accent: #059669;
+    --accent-contrast: #ffffff;
+    --accent-soft: rgba(5, 150, 105, 0.10);
+    --danger: #dc2626;
+    --scrim: rgba(12, 10, 9, 0.38);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c0c0d;
+      --surface: #161619;
+      --text: #f5f5f4;
+      --text-2: #a8a29e;
+      --line: #2b2b30;
+      --key: #1d1d21;
+      --key-active: #26262b;
+      --accent: #34d399;
+      --accent-contrast: #0c0c0d;
+      --accent-soft: rgba(52, 211, 153, 0.14);
+      --danger: #f87171;
+      --scrim: rgba(0, 0, 0, 0.52);
+    }
+  }
+
+  /* ============ BASE ============ */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: "Satoshi", ui-sans-serif, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+  }
+  body.locked { overflow: hidden; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; touch-action: manipulation; }
+  button, .dot { -webkit-tap-highlight-color: transparent; }
+
+  .screen {
+    min-height: 100vh;
+    min-height: 100dvh;
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  body.kp-open .screen { transform: translateY(-130px); }
+
+  /* ============ ENTRANCE ============ */
+  .rise {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: var(--d, 0s);
+  }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+
+  /* ============ HEADER ============ */
+  .brand {
+    position: sticky; top: 0; z-index: 10;
+    margin: 0 -24px 28px; padding: 24px 24px 10px;
+    display: flex; align-items: center; gap: 12px;
+    background: var(--bg);
+  }
+  .brand-mark {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: var(--accent); color: var(--accent-contrast);
+    display: grid; place-items: center;
+    font-weight: 900; font-size: 17px; letter-spacing: -0.02em;
+  }
+  .brand-name { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+
+  /* ============ STEP PANELS ============ */
+  .step {
+    flex: 1; /* isi sisa tinggi layar: greeting di atas, form di tengah, foot di bawah */
+    display: flex; flex-direction: column;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  .form-body { margin: auto 0; display: flex; flex-direction: column; }
+  .step.leaving { opacity: 0; transform: translateX(-16px); pointer-events: none; position: absolute; inset: 24px; }
+  .step.entering-start { opacity: 0; transform: translateX(24px); }
+
+  h1 {
+    font-size: 28px; font-weight: 900;
+    letter-spacing: -0.03em; line-height: 1.15;
+    margin-bottom: 8px;
+  }
+  h1 em { font-style: italic; }
+  .sub { font-size: 15px; color: var(--text-2); line-height: 1.5; max-width: 32ch; }
+
+  /* ============ STEP 1: NIU ============ */
+  .field-block { display: flex; flex-direction: column; gap: 8px; }
+  .field-block label { font-size: 13px; font-weight: 700; letter-spacing: 0.01em; }
+  .field-block .hint { font-size: 12.5px; color: var(--text-2); min-height: 16px; transition: color 0.2s; }
+  .hint.danger { color: var(--danger); }
+
+  .field {
+    width: 100%; height: 56px;
+    border: 1.5px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+    padding: 0 18px;
+    font-size: 17px; font-weight: 500;
+    color: var(--text);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .field::placeholder { color: var(--text-2); font-weight: 500; }
+  .field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  input.field { appearance: none; }
+  .niu-wrap.err .field { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.10); }
+  .niu-wrap.shake { animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+
+  .cta {
+    margin-top: 20px;
+    width: 100%;
+    height: 56px; border-radius: 16px;
+    background: var(--accent); color: var(--accent-contrast);
+    font-size: 16px; font-weight: 700; letter-spacing: 0.01em;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: transform 0.15s, opacity 0.2s, background 0.2s;
+  }
+  .cta:active { transform: scale(0.97); }
+  .cta.loading { opacity: 0.7; pointer-events: none; }
+  .cta.loading i { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .foot { margin-top: auto; padding-top: 40px; font-size: 13px; color: var(--text-2); }
+  .foot a { color: var(--accent); text-decoration: none; font-weight: 700; }
+
+  /* ============ STEP 2: PIN ============ */
+  .pin-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .back-btn {
+    width: 40px; height: 40px; margin-left: -10px;
+    border-radius: 999px;
+    display: grid; place-items: center;
+    font-size: 20px; color: var(--text);
+    transition: background 0.2s;
+  }
+  .back-btn:active { background: var(--accent-soft); }
+
+  .user-chip {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: 16px;
+    padding: 12px 14px;
+    margin-top: 24px;
+  }
+  .avatar {
+    width: 42px; height: 42px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center;
+    font-weight: 900; font-size: 15px;
+  }
+  .user-chip .ux { flex: 1; min-width: 0; }
+  .user-chip .ux b { display: block; font-size: 14.5px; letter-spacing: -0.01em; }
+  .user-chip .ux span { font-size: 12.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .switch-btn { font-size: 12.5px; font-weight: 700; color: var(--accent); padding: 6px 4px; }
+
+  .dots-big { display: flex; gap: 16px; justify-content: center; }
+  .dot {
+    width: 18px; height: 18px; border-radius: 999px;
+    border: 1.5px solid var(--line);
+    background: transparent;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  }
+  .dot.filled { background: var(--accent); border-color: var(--accent); }
+  .dot.pop { animation: pop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  @keyframes pop { from { transform: scale(0.5); } to { transform: scale(1); } }
+  .dots-big.loading .dot.filled { animation: breathe 0.9s ease-in-out infinite; }
+  @keyframes breathe { 50% { opacity: 0.35; } }
+  .dots-big.error .dot.filled { background: var(--danger); border-color: var(--danger); }
+
+  .pin-hint { text-align: center; font-size: 13px; color: var(--text-2); min-height: 18px; transition: color 0.2s; }
+  .pin-hint.danger { color: var(--danger); }
+  .pin-area.shake { animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+  @keyframes shake {
+    10%, 90% { transform: translateX(-1px); }
+    20%, 80% { transform: translateX(2px); }
+    30%, 50%, 70% { transform: translateX(-5px); }
+    40%, 60% { transform: translateX(5px); }
+  }
+
+  /* ============ KEYPAD ============ */
+  .keypad {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    max-width: 580px; margin: 0 auto;
+    background: var(--surface);
+    border-radius: 24px 24px 0 0;
+    padding: 14px 24px calc(24px + env(safe-area-inset-bottom));
+    transform: translateY(100%);
+    visibility: hidden;
+    transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 0.42s;
+    box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.14);
+  }
+  .keypad.open {
+    transform: translateY(0);
+    visibility: visible;
+    transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s;
+  }
+  .keypad.disabled .key { pointer-events: none; opacity: 0.55; }
+
+  .grabber {
+    width: 36px; height: 4px; border-radius: 999px;
+    background: var(--line); margin: 0 auto 14px;
+  }
+  .pin-area {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px; max-width: 320px; margin: 2px auto 14px;
+  }
+
+  .keys {
+    max-width: 320px; margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .key {
+    height: 62px;
+    border-radius: 16px;
+    background: var(--key);
+    border: 1px solid var(--line);
+    font-size: 24px; font-weight: 700;
+    display: grid; place-items: center;
+    transition: transform 0.12s ease, background 0.12s, opacity 0.2s;
+    user-select: none;
+  }
+  .key:active { transform: scale(0.94); background: var(--key-active); }
+  .key i { font-size: 22px; }
+  .key.util { font-size: 18px; font-weight: 700; color: var(--text-2); }
+
+  /* ============ SUCCESS ============ */
+  .success {
+    position: fixed; inset: 0; z-index: 60;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 8px; padding: 24px; text-align: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.35s ease;
+  }
+  .success.show { opacity: 1; pointer-events: auto; }
+  .success .ring {
+    width: 72px; height: 72px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center;
+    font-size: 36px; margin-bottom: 12px;
+    transform: scale(0.6);
+    transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s;
+  }
+  .success.show .ring { transform: scale(1); }
+  .success h2 { font-size: 22px; font-weight: 900; letter-spacing: -0.02em; }
+  .success p { font-size: 14.5px; color: var(--text-2); }
+  .success .again {
+    margin-top: 24px; height: 44px; padding: 0 24px;
+    border: 1.5px solid var(--line); border-radius: 999px;
+    font-size: 14px; font-weight: 700; color: var(--text-2);
+    transition: transform 0.15s, border-color 0.2s, color 0.2s;
+  }
+  .success .again:active { transform: scale(0.96); }
+
+  /* ============ REDUCED MOTION ============ */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    .rise { opacity: 1; transform: none; }
+  }
+
+  /* .screen sudah di-cap 560px — form mengisi step, kolom sejajar */
+</style>
+</head>
+<body>
+
+<main class="screen">
+  <header class="brand rise" style="--d: 0.05s">
+    <div class="brand-mark">SK</div>
+    <div class="brand-name">Sistem Kuliah</div>
+  </header>
+
+  <!-- STEP 1: NIU -->
+  <section class="step rise" style="--d: 0.12s" id="stepNiu">
+    <h1>Selamat datang <em>kembali</em></h1>
+    <p class="sub">Masukkan NIU kamu untuk melanjutkan.</p>
+
+    <div class="form-body">
+      <div class="field-block">
+        <label for="niu">NIU</label>
+        <div class="niu-wrap" id="niuWrap">
+          <input class="field" id="niu" type="text" inputmode="numeric"
+                 placeholder="Contoh: 2210510042" maxlength="12" autocomplete="off" />
+        </div>
+        <p class="hint" id="niuHint">6 sampai 12 digit angka</p>
+      </div>
+
+      <button type="button" class="cta" id="btnNext">
+        <span>Lanjutkan</span><i class="ph-bold ph-arrow-right"></i>
+      </button>
+    </div>
+
+    <footer class="foot">
+      Lupa NIU? <a href="#">Hubungi admin akademik</a>
+    </footer>
+  </section>
+
+  <!-- STEP 2: PIN -->
+  <section class="step entering-start" id="stepPin" hidden>
+    <div class="pin-head">
+      <button type="button" class="back-btn" id="btnBack" aria-label="Kembali">
+        <i class="ph-bold ph-arrow-left"></i>
+      </button>
+      <h1 style="margin: 0;">Masukkan <em>PIN</em></h1>
+    </div>
+    <p class="sub" style="margin-left: 30px;">PIN 6 digit untuk masuk ke akun kamu.</p>
+
+    <div class="form-body">
+      <div class="user-chip">
+        <div class="avatar" id="avatar">MR</div>
+        <div class="ux">
+          <b id="chipName">Muzakie Ramadhan</b>
+          <span id="chipNiu">2210•••042</span>
+        </div>
+        <button type="button" class="switch-btn" id="btnSwitch">Ganti</button>
+      </div>
+    </div>
+
+    <footer class="foot">
+      Lupa PIN? <a href="#">Hubungi admin akademik</a>
+    </footer>
+  </section>
+</main>
+
+<section class="keypad" id="keypad" role="dialog" aria-modal="true" aria-label="Keypad PIN">
+  <div class="grabber"></div>
+  <div class="pin-area" id="pinArea">
+    <div class="dots-big" id="dots" aria-hidden="true">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    </div>
+    <p class="pin-hint" id="pinHint">Masukkan 6 digit PIN</p>
+  </div>
+  <div class="keys" id="keys">
+    <button type="button" class="key" data-key="1">1</button>
+    <button type="button" class="key" data-key="2">2</button>
+    <button type="button" class="key" data-key="3">3</button>
+    <button type="button" class="key" data-key="4">4</button>
+    <button type="button" class="key" data-key="5">5</button>
+    <button type="button" class="key" data-key="6">6</button>
+    <button type="button" class="key" data-key="7">7</button>
+    <button type="button" class="key" data-key="8">8</button>
+    <button type="button" class="key" data-key="9">9</button>
+    <button type="button" class="key util" id="keyClear" aria-label="Hapus semua">C</button>
+    <button type="button" class="key" data-key="0">0</button>
+    <button type="button" class="key" id="keyDel" aria-label="Hapus satu digit">
+      <i class="ph-fill ph-backspace"></i>
+    </button>
+  </div>
+</section>
+
+<div class="success" id="success">
+  <div class="ring"><i class="ph-bold ph-check"></i></div>
+  <h2>Berhasil masuk</h2>
+  <p>Mengalihkan ke dashboard kamu.</p>
+  <button type="button" class="again" id="next">Buka dashboard</button>
+</div>
+
+<script>
+  const state = {
+    pin: "", phase: "idle", user: null,
+    mode: "login", // login | activate
+    pendingPin: "", // PIN pertama saat aktivasi (menunggu konfirmasi)
+  }; // phase: idle | checking-niu | loading | error | success
+
+  // Sudah login? Langsung ke dashboard.
+  fetch("/api/me", { headers: { Accept: "application/json" }, credentials: "same-origin" })
+    .then((r) => { if (r.ok) location.replace("/app/dashboard.html"); })
+    .catch(() => {});
+
+  const $ = (id) => document.getElementById(id);
+  const niu = $("niu"), niuWrap = $("niuWrap"), niuHint = $("niuHint");
+  const stepNiu = $("stepNiu"), stepPin = $("stepPin");
+  const dots = $("dots"), pinHint = $("pinHint"), pinArea = $("pinArea");
+  const keypad = $("keypad");
+  const dotEls = [...dots.children];
+
+  const buzz = (p) => { if (navigator.vibrate) navigator.vibrate(p); };
+  const maskNiu = (v) => v.length <= 7 ? v : v.slice(0, 4) + "•••" + v.slice(-3);
+  const initials = (n) => n.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+
+  /* ---------- API helper (session cookie + CSRF) ---------- */
+  function xsrfToken() {
+    const m = document.cookie.match(/(?:^|;\\s*)XSRF-TOKEN=([^;]*)/);
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+
+  async function api(path, body) {
+    const res = await fetch(path, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-XSRF-TOKEN": xsrfToken(),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  const firstError = (data) => {
+    if (data && data.errors) {
+      const v = Object.values(data.errors)[0];
+      if (Array.isArray(v)) return v[0];
+      if (typeof v === "string") return v;
+    }
+    return (data && data.message) || "Terjadi kesalahan. Coba lagi.";
+  };
+
+  const userTagline = (u) => {
+    const bits = [u.theory_class, u.practicum_group].filter(
+      (x) => x && x !== "-"
+    );
+    return bits.length ? bits.join(" · ") : "Mahasiswa";
+  };
+
+  /* ---------- STEP 1: NIU ---------- */
+  niu.addEventListener("input", () => {
+    niu.value = niu.value.replace(/\D/g, "").slice(0, 12);
+    niuHint.textContent = "6 sampai 12 digit angka";
+    niuHint.classList.remove("danger");
+    niuWrap.classList.remove("err");
+  });
+  niu.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); submitNiu(); }
+  });
+  $("btnNext").addEventListener("click", submitNiu);
+
+  function rejectNiu(msg) {
+    niuHint.textContent = msg;
+    niuHint.classList.add("danger");
+    niuWrap.classList.add("err");
+    niuWrap.classList.remove("shake");
+    void niuWrap.offsetWidth;
+    niuWrap.classList.add("shake");
+    niu.focus();
+    buzz(40);
+  }
+
+  async function submitNiu() {
+    if (state.phase !== "idle") return;
+    const v = niu.value.trim();
+    if (v.length < 6) return rejectNiu("Isi NIU dulu, minimal 6 digit");
+
+    const btn = $("btnNext");
+    state.phase = "checking-niu";
+    btn.classList.add("loading");
+    btn.innerHTML = '<i class="ph-bold ph-circle-notch"></i><span>Memeriksa</span>';
+
+    try {
+      const { ok, data } = await api("/api/auth/check-niu", { niu: v });
+      if (!ok) {
+        rejectNiu(data.message || "NIU tidak terdaftar");
+        return;
+      }
+      enterPinStep(data.user, v, data.status);
+    } catch {
+      rejectNiu("Gagal terhubung ke server. Coba lagi.");
+    } finally {
+      btn.classList.remove("loading");
+      btn.innerHTML = '<span>Lanjutkan</span><i class="ph-bold ph-arrow-right"></i>';
+      state.phase = "idle";
+    }
+  }
+
+  /* ---------- STEP TRANSITION ---------- */
+  function enterPinStep(user, v, status) {
+    state.user = { ...user, niu: v };
+    state.mode = status === "needs_activation" ? "activate" : "login";
+    state.pendingPin = "";
+    $("chipName").textContent = user.name;
+    $("chipNiu").textContent = maskNiu(v) + " · " + userTagline(user);
+    $("avatar").textContent = initials(user.name);
+    pinHint.textContent = state.mode === "activate"
+      ? "Akun baru — buat PIN 6 digit"
+      : "Masukkan 6 digit PIN";
+    switchStep(true);
+    buzz(10);
+    setTimeout(openKeypad, 350); // tunggu panel transition, lalu keypad slide-up
+  }
+
+  function backToNiu() {
+    closeKeypad();
+    state.pin = "";
+    state.phase = "idle";
+    renderDots();
+    pinHint.textContent = "Masukkan 6 digit PIN";
+    pinHint.classList.remove("danger");
+    setTimeout(() => switchStep(false), 250);
+    niu.focus();
+  }
+
+  function switchStep(toPin) {
+    const from = toPin ? stepNiu : stepPin;
+    const to = toPin ? stepPin : stepNiu;
+    from.classList.add("leaving");
+    setTimeout(() => {
+      from.hidden = true;
+      from.classList.remove("leaving");
+      to.hidden = false;
+      to.classList.add("entering-start");
+      void to.offsetWidth;
+      to.classList.remove("entering-start");
+    }, 300);
+  }
+
+  $("btnBack").addEventListener("click", backToNiu);
+  $("btnSwitch").addEventListener("click", backToNiu);
+
+  /* ---------- Keypad ---------- */
+  function openKeypad() {
+    if (state.phase === "success") return;
+    document.body.classList.add("kp-open");
+    keypad.classList.add("open");
+    document.body.classList.add("locked");
+  }
+  function closeKeypad() {
+    document.body.classList.remove("kp-open");
+    keypad.classList.remove("open");
+    document.body.classList.remove("locked");
+  }
+
+  function renderDots() {
+    dotEls.forEach((d, i) => {
+      const wasFilled = d.classList.contains("filled");
+      const shouldFill = i < state.pin.length;
+      d.classList.toggle("filled", shouldFill);
+      if (shouldFill && !wasFilled) {
+        d.classList.remove("pop");
+        void d.offsetWidth;
+        d.classList.add("pop");
+      }
+    });
+  }
+
+  function pressDigit(d) {
+    if (state.phase !== "idle" || state.pin.length >= 6) return;
+    state.pin += d;
+    renderDots();
+    buzz(8);
+    if (state.pin.length === 6) {
+      if (state.mode === "activate" && !state.pendingPin) setTimeout(beginConfirm, 260);
+      else setTimeout(submit, 260);
+    }
+  }
+
+  function beginConfirm() {
+    state.pendingPin = state.pin;
+    state.pin = "";
+    renderDots();
+    pinHint.textContent = "Ulangi PIN untuk konfirmasi";
+  }
+  function pressDelete() {
+    if (state.phase !== "idle") return;
+    state.pin = state.pin.slice(0, -1);
+    renderDots();
+    buzz(8);
+  }
+  function pressClear() {
+    if (state.phase !== "idle") return;
+    state.pin = "";
+    renderDots();
+    buzz(12);
+  }
+
+  $("keys").addEventListener("click", (e) => {
+    const key = e.target.closest(".key");
+    if (!key) return;
+    if (key.id === "keyDel") return pressDelete();
+    if (key.id === "keyClear") return pressClear();
+    if (key.dataset.key) pressDigit(key.dataset.key);
+  });
+
+  /* ---------- Submit PIN ---------- */
+  async function submit() {
+    state.phase = "loading";
+    keypad.classList.add("disabled");
+    dots.classList.add("loading");
+    pinHint.textContent = state.mode === "activate" ? "Mengaktifkan akun" : "Memeriksa PIN";
+    pinHint.classList.remove("danger");
+
+    const endpoint = state.mode === "activate" ? "/api/auth/activate" : "/api/auth/login";
+    const body = state.mode === "activate"
+      ? { niu: state.user.niu, pin: state.pendingPin, pin_confirmation: state.pin }
+      : { niu: state.user.niu, pin: state.pin };
+
+    try {
+      const { ok, data } = await api(endpoint, body);
+      if (!ok) return fail(firstError(data));
+      succeed(data);
+    } catch {
+      fail("Gagal terhubung ke server. Coba lagi.");
+    }
+  }
+
+  function fail(msg) {
+    state.phase = "error";
+    dots.classList.remove("loading");
+    dots.classList.add("error");
+    pinArea.classList.remove("shake");
+    void pinArea.offsetWidth;
+    pinArea.classList.add("shake");
+    pinHint.textContent = msg;
+    pinHint.classList.add("danger");
+    buzz([40, 60, 40]);
+    setTimeout(() => {
+      state.pin = "";
+      state.pendingPin = "";
+      state.phase = "idle";
+      dots.classList.remove("error");
+      keypad.classList.remove("disabled");
+      renderDots();
+      pinHint.textContent = state.mode === "activate"
+        ? "Buat PIN baru (6 digit)"
+        : "Masukkan 6 digit PIN";
+      pinHint.classList.remove("danger");
+    }, 700);
+  }
+
+  function succeed(data) {
+    state.phase = "success";
+    closeKeypad();
+    if (data && data.message) {
+      document.querySelector(".success p").textContent = data.message;
+    }
+    $("success").classList.add("show");
+    buzz([12, 40, 18]);
+    setTimeout(() => { location.href = "/app/dashboard.html"; }, 1200);
+  }
+
+  $("next").addEventListener("click", () => { location.href = "/app/dashboard.html"; });
+
+  /* ---------- Physical keyboard (desktop) ---------- */
+  document.addEventListener("keydown", (e) => {
+    if (keypad.classList.contains("open")) {
+      if (/^[0-9]$/.test(e.key)) return pressDigit(e.key);
+      if (e.key === "Backspace") { e.preventDefault(); pressDelete(); }
+      if (e.key === "Escape") backToNiu();
+    }
+  });
+</script>
+</body>
+</html>

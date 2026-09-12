@@ -1,0 +1,16 @@
+﻿{
+  "name": "Portal Kelas & Praktikum TRI",
+  "short_name": "Portal TRI",
+  "description": "Pantau jadwal kuliah, praktikum kloter lab, switch daring Zoom/Meet, dan tugas.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -1,0 +1,780 @@
+DEMO SCRIPT LAMA DINONAKTIFKAN — diganti app.js (API Laravel)
+
+  // Demo hook: ?t=09:45 memaksa jam tertentu (untuk screenshot/demo).
+  // ?d=4 memaksa hari (0 Minggu ... 6 Sabtu). Tanpa param, real device dipakai.
+  const demoT = new URLSearchParams(location.search).get("t");
+  const demoD = new URLSearchParams(location.search).get("d");
+
+  // jadwal mingguan: key = getDay() (0 Minggu ... 6 Sabtu), menit sejak tengah malam
+  // week digenerate dari mapels — definisi ada di bawah deklarasi mapels (hindari TDZ)
+  const DAY_NAME2IDX = { Senin: 1, Selasa: 2, Rabu: 3, Kamis: 4, Jumat: 5, Sabtu: 6 };
+  const t2m = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  let week = {};
+  const buildWeek = () => {
+    week = {};
+    for (const mp of mapels) {
+      const d = DAY_NAME2IDX[mp.day];
+      (week[d] = week[d] || []).push({ start: t2m(mp.start), end: t2m(mp.end), name: mp.name, room: mp.room, lect: mp.lect, kelas: mp.kelas, jenis: mp.jenis });
+    }
+    for (const d of Object.keys(week)) week[d].sort((a, b) => a.start - b.start);
+  };
+  const DAY_IDX = demoD !== null ? +demoD % 7 : new Date().getDay();
+  const todayKey = new Date().toISOString().slice(0, 10);
+  // Override dadakan: dosen ubah jadwal hari ini jadi daring (sumber: panel Kelola Kelas).
+  // name harus cocok dengan matkul week[] hari ini. one-shot per tanggal.
+  let overrides = [
+    // demo: Basis Data AA (jadwal Kamis) dijadikan daring — biar override kelihatan
+    { date: dateKeyOf(4), name: "Basis Data", kelas: "AA", platform: "Zoom", link: "https://zoom.us/j/9876543210", by: "Bu Ratna Dewi", at: "07.15" },
+  ];
+  const ovKey = (c) => c.name + "|" + c.kelas; // override per kelas (A1 ≠ A2)
+  const applyOverride = (c, key = todayKey) => {
+    const o = overrides.find((x) => x.date === key && ovKey(x) === ovKey(c));
+    return o ? { ...c, online: true, platform: o.platform, link: o.link, note: o } : c;
+  };
+  // tanggal (YYYY-MM-DD) milik chip hari di minggu berjalan — bisa hari ini, besok, dst.
+  // ponytail: toISOString (UTC) konsisten dgn todayKey; ganti helper lokal kalau muncul bug tengah malam WIB.
+  function dateKeyOf(dayIdx) { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + [1, 2, 3, 4, 5, 6, 0].indexOf(dayIdx)); return d.toISOString().slice(0, 10); }
+  // identitas demo: semua role = mahasiswa kelas A1 → teori grup A (AA) + praktikum A1
+  const MY_KELAS = "A1", MY_TEORI = "A" + "A";
+  const mine = (c) => c.kelas === MY_KELAS || c.kelas === MY_TEORI;
+  const courses = (week[DAY_IDX] || []).filter(mine).map(applyOverride); // beranda tetap pakai jadwal hari ini
+  const GRACE = 2; // menit tenggang setelah kelas "live" selesai sebelum dianggap terlewat di beranda
+
+  // tugas: due = menit sejak tengah malam hari ini (demo). done = sudah dikumpul
+  const tasks = [
+    { name: "Essay Normalisasi Basis Data",   course: "Basis Data",        due: 1439, done: false }, // hari ini 23.59
+    { name: "Laporan Praktikum Routing",      course: "Jaringan Komputer", due: 750,  done: false }, // 12.30
+    { name: "Kuis Struktur Data",             course: "Struktur Data",     due: 0,    done: true  },
+    { name: "Mockup UI Proyek Akhir",         course: "Pemrograman Web",   due: 1020, done: false }, // 17.00
+  ];
+
+  const fmt = (m) => String(Math.floor(m / 60)).padStart(2, "0") + "." + String(m % 60).padStart(2, "0");
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== Preferensi tersimpan (localStorage) ===== */
+  const savedTheme = localStorage.getItem("sk-theme");
+  const ROLE = new URLSearchParams(location.search).get("role") || localStorage.getItem("sk-role") || "student";
+  if (savedTheme === "light" || savedTheme === "dark") document.documentElement.dataset.theme = savedTheme;
+  if (localStorage.getItem("sk-anim") === "off") document.documentElement.classList.add("no-anim");
+  const vib = (p) => { if (localStorage.getItem("sk-vib") !== "off" && navigator.vibrate) navigator.vibrate(p); };
+
+  function nowMin() {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+  }
+  function t() { return demoT ? +demoT.split(":")[0] * 60 + +demoT.split(":")[1] : nowMin(); }
+
+  function status(c, n) {
+    if (c.cancelled) return "off";
+    if (n >= c.end) return "done";
+    if (n >= c.start) return "live";
+    return "next";
+  }
+
+  function renderGreeting(n) {
+    const h = Math.floor(n / 60);
+    const word = h < 11 ? "pagi" : h < 15 ? "siang" : h < 19 ? "sore" : "malam";
+    $("greet").innerHTML = "Selamat " + word + ", <em>Muzakie</em>";
+    $("today").textContent = new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date());
+  }
+
+  function renderLive(n) {
+    const cur = courses.find((c) => status(c, n) === "live");
+    const card = $("liveCard");
+    if (!cur) { card.hidden = true; return; }
+    card.hidden = false;
+    $("liveTitle").textContent = cur.name;
+    $("liveMeta").textContent = (cur.online ? "Daring · " + cur.platform : cur.room) + " · " + cur.lect;
+    const join = $("liveJoin");
+    join.hidden = !cur.online;
+    if (cur.online) { join.href = cur.link; join.innerHTML = '<i class="ph-fill ph-video-camera" aria-hidden="true"></i> Gabung ' + cur.platform; }
+    $("liveStart").textContent = "Mulai " + fmt(cur.start);
+    $("liveEnd").textContent = "Selesai " + fmt(cur.end);
+    const pct = Math.min(100, Math.max(0, ((n - cur.start) / (cur.end - cur.start)) * 100));
+    requestAnimationFrame(() => { $("liveFill").style.width = pct.toFixed(1) + "%"; });
+    const left = Math.max(0, Math.round(cur.end - n));
+    const h = Math.floor(left / 60), m = Math.round(left % 60);
+    $("liveRemain").textContent = "Sisa " + (h > 0 ? h + "j " : "") + m + "m";
+  }
+
+  function classCard(c, st) {
+    const badges = { done: "Selesai", live: "Berlangsung", off: "Dibatalkan" };
+    return (
+      '<div class="time num">' + fmt(c.start) + "</div>" +
+      '<div class="rail"><span class="node"></span></div>' +
+      '<div class="card">' +
+        '<div class="row1"><h4>' + c.name + ' <span class="kbadge">' + esc(c.kelas) + "</span></h4>" +
+        (c.online ? '<span class="badge online">Daring</span>' : "") +
+        (st !== "next" ? '<span class="badge ' + (st === "off" ? "cancel" : "done") + '">' + badges[st] + "</span>" : "") +
+        "</div>" +
+        '<p class="meta">' + (c.jenis === "praktikum" ? "Praktikum · " : "") + fmt(c.start) + " - " + fmt(c.end) + " · " + (c.online ? "Daring · " + c.platform : c.room) + " · " + c.lect + "</p>" +
+      "</div>"
+    );
+  }
+  const itemClass = (c) => "item " + c.st + (c.online ? " online" : "");
+
+  function renderList(n) {
+    const tl = $("tl");
+    tl.innerHTML = "";
+    // Beranda: kelas dibatalkan & yang sudah lewat (end + grace) auto disembunyikan.
+    // Kelas daring: ruang diganti nama platform (Meet/Zoom).
+    const items = courses.filter((c) => !c.cancelled && n < c.end + GRACE)
+      .map((c) => ({ ...c, st: status(c, n) }))
+      .sort((a, b) => a.start - b.start);
+    for (const c of items) {
+      const el = document.createElement("div");
+      el.className = itemClass(c);
+      el.innerHTML = classCard(c, c.st);
+      tl.appendChild(el);
+    }
+    $("count").textContent = items.length + " kelas";
+    const none = items.length === 0;
+    $("empty").style.display = none ? "block" : "none";
+    tl.style.display = none ? "none" : "flex";
+    // Bedakan "memang tak ada jadwal" vs "semua kelas sudah selesai/terlewat"
+    if (none) {
+      const spent = courses.length > 0;
+      $("empty").classList.toggle("win", spent);
+      $("empty").querySelector("i").className = spent ? "ph-fill ph-check-circle" : "ph ph-calendar-x";
+      $("empty").querySelector("h4").textContent = spent ? "Kelas hari ini sudah tuntas" : "Belum ada jadwal";
+      $("empty").querySelector("p").textContent = spent ? "Semua jadwal sudah selesai atau terlewat. Selamat beristirahat!" : "Nikmati harimu, tidak ada kelas hari ini.";
+    }
+  }
+
+  function renderTasks(n) {
+    const list = $("taskList");
+    const open = tasks.filter((t) => !t.done);
+    const sorted = [...open].sort((a, b) => a.due - b.due);
+    $("taskCount").textContent = open.length > 0 ? open.length + " aktif" : "beres semua";
+    $("taskEmpty").hidden = open.length > 0;
+    list.innerHTML = "";
+    for (const t of sorted) {
+      const row = document.createElement("div");
+      row.className = "task-row" + (t.done ? " done" : "");
+      let dueHtml;
+      if (t.done) {
+        dueHtml = '<span class="due ok">Selesai</span>';
+      } else if (t.due <= n) {
+        dueHtml = '<span class="due urgent">Terlambat</span>';
+      } else if (t.due - n <= 240) {
+        dueHtml = '<span class="due urgent num">Hari ini ' + fmt(t.due) + "</span>";
+      } else {
+        dueHtml = '<span class="due num">Hari ini ' + fmt(t.due) + "</span>";
+      }
+      row.innerHTML =
+        '<div class="tx"><b>' + t.name + "</b><span>" + t.course + "</span></div>" + dueHtml;
+      list.appendChild(row);
+    }
+  }
+
+  /* ===== View Jadwal ===== */
+  const DAY_ABBR = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+  const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // urutan chip: Senin -> Minggu
+  let jdDay = DAY_IDX;
+
+  function renderJadwal(animate) {
+    const chips = $("chips");
+    const mon = new Date();
+    mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7)); // Senin minggu ini
+    $("jdWeek").textContent = new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(mon);
+
+    chips.innerHTML = "";
+    let i = 0;
+    for (const d of DAY_ORDER) {
+      const dt = new Date(mon);
+      dt.setDate(mon.getDate() + i++);
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip" + (d === DAY_IDX ? " today" : "") + (d === jdDay ? " sel" : "");
+      b.innerHTML = '<span class="dl">' + DAY_ABBR[d] + '</span><span class="dn num">' + dt.getDate() + "</span>";
+      b.addEventListener("click", () => {
+        if (jdDay === d) return;
+        jdDay = d;
+        vib(6);
+        renderJadwal(true);
+      });
+      chips.appendChild(b);
+    }
+    const sel = chips.querySelector(".sel");
+    if (sel) chips.scrollLeft = (sel.offsetLeft - chips.offsetLeft) - (chips.clientWidth - sel.offsetWidth) / 2;
+
+    const n = t();
+    const isToday = jdDay === DAY_IDX;
+    const list = [...(week[jdDay] || [])].filter(mine).map((c) => applyOverride(c, dateKeyOf(jdDay))).sort((a, b) => a.start - b.start);
+    const tl = $("jdTl");
+    tl.innerHTML = "";
+    let jp = 0;
+    list.forEach((c, idx) => {
+      const st = c.cancelled ? "off" : isToday ? status(c, n) : "next";
+      if (!c.cancelled) jp += Math.round((c.end - c.start) / 50);
+      const el = document.createElement("div");
+      el.className = itemClass(c);
+      el.innerHTML = classCard(c, st);
+      if (animate) { el.classList.add("rise"); el.style.setProperty("--d", (idx * 0.05).toFixed(2) + "s"); }
+      tl.appendChild(el);
+    });
+    const none = list.length === 0;
+    $("jdEmpty").style.display = none ? "block" : "none";
+    tl.style.display = none ? "none" : "flex";
+    $("jdSum").hidden = none;
+    if (!none) $("jdSum").textContent = list.length + " kelas · " + jp + " JP";
+  }
+
+  /* ===== View Tugas ===== */
+  let tgFilter = "semua";
+
+  function tgDue(t, n) {
+    if (t.done) return '<span class="due ok">Selesai</span>';
+    if (t.due <= n) return '<span class="due urgent">Terlambat</span>';
+    if (t.due - n <= 240) return '<span class="due urgent num">Hari ini ' + fmt(t.due) + "</span>";
+    return '<span class="due num">Hari ini ' + fmt(t.due) + "</span>";
+  }
+
+  function renderTugas(n) {
+    const open = tasks.filter((x) => !x.done);
+    $("tgSum").textContent = open.length + " aktif · " + (tasks.length - open.length) + " selesai";
+    const filtered = tasks
+      .filter((x) => tgFilter === "semua" ? true : tgFilter === "aktif" ? !x.done : x.done)
+      .sort((a, b) => (a.done - b.done) || (a.due - b.due));
+    const list = $("tgList");
+    list.innerHTML = "";
+    for (const t of filtered) {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "tg-row" + (t.done ? " done" : "");
+      row.innerHTML =
+        '<span class="chk" aria-hidden="true"><i class="ph-bold ph-check"></i></span>' +
+        '<span class="tx"><span class="nm">' + t.name + '</span><span class="cs">' + t.course + "</span></span>" +
+        tgDue(t, n);
+      row.addEventListener("click", () => {
+        t.done = !t.done;
+        vib(t.done ? 10 : 6);
+        tick();
+      });
+      list.appendChild(row);
+    }
+    const eg = $("tgEmpty");
+    eg.hidden = filtered.length > 0;
+    if (!filtered.length) {
+      eg.querySelector("i").className = tgFilter === "aktif" ? "ph-fill ph-check-circle" : "ph ph-clipboard-text";
+      eg.querySelector("h4").textContent = tgFilter === "aktif" ? "Semua beres" : "Belum ada tugas";
+      eg.querySelector("p").textContent = tgFilter === "aktif" ? "Tidak ada tugas aktif, kerja bagus." : "Tugas dari dosen akan muncul di sini.";
+    }
+  }
+
+  $("fchips").addEventListener("click", (e) => {
+    const b = e.target.closest(".fchip");
+    if (!b || b.dataset.f === tgFilter) return;
+    tgFilter = b.dataset.f;
+    [...$("fchips").children].forEach((c) => c.classList.toggle("sel", c === b));
+    vib(6);
+    renderTugas(t());
+  });
+
+  /* ===== Profil: panel pengaturan ===== */
+  function openPanel(id) {
+    const p = $(id);
+    p.classList.add("open");
+    p.setAttribute("aria-hidden", "false");
+    document.body.classList.add("locked");
+  }
+  function closePanels() {
+    document.querySelectorAll(".panel.open").forEach((p) => {
+      p.classList.remove("open");
+      p.setAttribute("aria-hidden", "true");
+    });
+    if (!$("sheetOut").classList.contains("open")) document.body.classList.remove("locked");
+  }
+  document.querySelectorAll(".panel-back").forEach((b) => b.addEventListener("click", closePanels));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeSheets(); closePanels(); } });
+
+  /* ---- Sheet keluar ---- */
+  function openSheetOut() {
+    $("scrimOut").classList.add("open");
+    $("sheetOut").classList.add("open");
+    document.body.classList.add("locked");
+  }
+  function closeSheets() {
+    $("scrimOut").classList.remove("open");
+    $("sheetOut").classList.remove("open");
+    document.body.classList.remove("locked");
+  }
+  $("scrimOut").addEventListener("click", closeSheets);
+  $("btnOutNo").addEventListener("click", closeSheets);
+  $("btnOutYes").addEventListener("click", () => { location.href = "./"; });
+
+  document.querySelectorAll(".menu-item.soon").forEach((b) => {
+    b.addEventListener("click", () => openPanel("panel-" + b.dataset.panel));
+  });
+  $("btnLogout").addEventListener("click", openSheetOut);
+
+  /* ---- Tema ---- */
+  const segTheme = $("segTheme");
+  function applyTheme(v) {
+    localStorage.setItem("sk-theme", v);
+    if (v === "sistem") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = v;
+    [...segTheme.children].forEach((b) => b.classList.toggle("sel", b.dataset.t === v));
+  }
+  segTheme.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-t]");
+    if (!b) return;
+    applyTheme(b.dataset.t);
+    vib(6);
+  });
+  applyTheme(localStorage.getItem("sk-theme") || "sistem");
+
+  /* ---- Role demo ---- */
+  const segRole = $("segRole");
+  function applyRole(v) {
+    localStorage.setItem("sk-role", v);
+    [...segRole.children].forEach((b) => b.classList.toggle("sel", b.dataset.r === v));
+  }
+  segRole.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-r]");
+    if (!b || b.dataset.r === ROLE) return;
+    applyRole(b.dataset.r);
+    vib(6);
+    setTimeout(() => location.reload(), 250);
+  });
+  applyRole(ROLE);
+
+  /* ===== Notifikasi: perubahan jadwal dadakan ===== */
+  const CAN_OV = ROLE === "admin" || ROLE === "pj"; // PJ Matkul & Ketua Kelas boleh kelola
+  function renderNotif() {
+    const act = overrides
+      .filter((o) => o.date >= todayKey)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const box = $("notifList");
+    box.innerHTML = "";
+    for (const o of act) {
+      const label = o.date === todayKey ? "hari ini" : new Intl.DateTimeFormat("id-ID", { weekday: "long" }).format(new Date(o.date + "T00:00:00"));
+      const row = document.createElement("div");
+      row.className = "set-row";
+      row.innerHTML =
+        '<div class="sx"><b>' + esc(o.name) + ' <span class="kbadge">' + esc(o.kelas) + '</span> jadi <span style="color: var(--info);">daring</span> ' + label + '</b>' +
+        '<span>' + esc(o.platform) + " · diumumkan " + esc(o.by) + " pkl " + esc(o.at) + "</span></div>" +
+        '<i class="ph-fill ph-video-camera" style="color: var(--info); font-size: 20px;" aria-hidden="true"></i>';
+      box.appendChild(row);
+    }
+    $("notifEmpty").hidden = act.length > 0;
+    $("bellPing").style.display = act.length > 0 ? "" : "none";
+    // Tombol ubah jadwal di menu Jadwal: pj/admin selalu bisa; titik merah = ada override aktif (hari ini / mendatang).
+    $("btnOv").hidden = !CAN_OV;
+    $("ovPing").style.display = act.length > 0 ? "" : "none";
+  }
+  $("btnBell").addEventListener("click", () => { openPanel("panel-notif"); renderNotif(); vib(6); });
+  $("btnOv").addEventListener("click", sheetOverrides);
+  renderNotif(); // init: ping lonceng + tombol jadwal bila ada override hari ini
+
+  /* ---- Switch ---- */
+  function bindSwitch(id, key, def, onChange) {
+    const el = $(id);
+    const saved = localStorage.getItem(key);
+    const on = saved === null ? def : saved === "on";
+    el.classList.toggle("on", on);
+    el.addEventListener("click", () => {
+      const now = !el.classList.contains("on");
+      el.classList.toggle("on", now);
+      localStorage.setItem(key, now ? "on" : "off");
+      vib(8);
+      if (onChange) onChange(now);
+    });
+  }
+  bindSwitch("swAnim", "sk-anim", true, (on) => document.documentElement.classList.toggle("no-anim", !on));
+  bindSwitch("swVib", "sk-vib", true);
+  bindSwitch("swNotJadwal", "sk-notif-jadwal", true);
+  bindSwitch("swNotTugas", "sk-notif-tugas", true);
+  bindSwitch("swNotInfo", "sk-notif-info", false);
+
+  /* ===== Navigasi tab ===== */
+  const tabs = [...document.querySelectorAll(".nav .tab")];
+  let toastTimer;
+
+  function showToast(msg) {
+    const el = $("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 1800);
+  }
+
+  function setTab(tab) {
+    for (const tb of tabs) {
+      const on = tb === tab;
+      tb.classList.toggle("active", on);
+      if (tb.dataset.icon) tb.querySelector("i").className = (on ? "ph-fill ph-" : "ph ph-") + tb.dataset.icon;
+    }
+  }
+
+  const VIEW_IDS = ["home", "jadwal", "tugas", "profil"];
+  tabs.forEach((tb) => {
+    tb.addEventListener("click", () => {
+      if (tb.classList.contains("active")) return;
+      setTab(tb);
+      const v = tb.dataset.view;
+      if (v === "jadwal") renderJadwal(true);
+      if (v === "tugas") renderTugas(t());
+      for (const id of VIEW_IDS) $("view-" + id).hidden = id !== v;
+      window.scrollTo(0, 0);
+      vib(6);
+    });
+  });
+
+  /* ===== Kelola Kelas (admin) ===== */
+  const ROLE_LABEL = { student: "Mahasiswa", pj: "PJ Matkul", admin: "Ketua Kelas" };
+  if (ROLE === "admin") $("btnKelola").hidden = false;
+
+  const KELAS_LIST = ["A1", "A2", "B1", "B2"];
+  const students = [
+    { niu: "2210510042", name: "Muzakie Ramadhan", kelas: "A1", role: "admin" },
+    { niu: "2210510001", name: "Aisyah Putri",     kelas: "A1", role: "student" },
+    { niu: "2210510002", name: "Bagas Pratama",    kelas: "A2", role: "pj" },
+    { niu: "2210510010", name: "Citra Lestari",    kelas: "B1", role: "student" },
+    { niu: "2210510011", name: "Dimas Saputra",    kelas: "B1", role: "student" },
+    { niu: "2210510012", name: "Eka Wulandari",    kelas: "B2", role: "pj" },
+  ];
+  const KELAS_TEORI = ["AA", "BB"], KELAS_PRAK = ["A1", "A2", "B1", "B2"];
+  const mapels = [
+    { name: "Pemrograman Web",  code: "CS3604", lect: "Pak Andi Prasetyo",  jenis: "teori",     kelas: "AA", day: "Kamis", start: "09:20", end: "11:00", room: "R. 301" },
+    { name: "Pemrograman Web",  code: "CS3604", lect: "Pak Andi Prasetyo",  jenis: "teori",     kelas: "BB", day: "Kamis", start: "13:00", end: "14:40", room: "R. 301" },
+    { name: "Basis Data",       code: "CS2502", lect: "Bu Ratna Dewi",       jenis: "teori",     kelas: "AA", day: "Kamis", start: "11:10", end: "12:50", room: "R. 205" },
+    { name: "Basis Data",       code: "CS2502", lect: "Bu Ratna Dewi",       jenis: "teori",     kelas: "BB", day: "Rabu",  start: "08:00", end: "09:40", room: "R. 205" },
+    { name: "Praktikum Basis Data",     code: "CS2502P", lect: "Bu Ratna Dewi",        jenis: "praktikum", kelas: "A1", day: "Selasa", start: "13:00", end: "15:30", room: "Lab 3" },
+    { name: "Praktikum Basis Data",     code: "CS2502P", lect: "Bu Ratna Dewi",        jenis: "praktikum", kelas: "A2", day: "Selasa", start: "13:00", end: "15:30", room: "Lab 4" },
+    { name: "Praktikum Basis Data",     code: "CS2502P", lect: "Bu Ratna Dewi",        jenis: "praktikum", kelas: "B1", day: "Selasa", start: "16:00", end: "18:30", room: "Lab 3" },
+    { name: "Praktikum Pemrograman Web", code: "CS3604P", lect: "Pak Andi Prasetyo",   jenis: "praktikum", kelas: "A1", day: "Sabtu",  start: "09:00", end: "11:30", room: "Lab 2" },
+    { name: "Praktikum Pemrograman Web", code: "CS3604P", lect: "Pak Andi Prasetyo",   jenis: "praktikum", kelas: "A2", day: "Sabtu",  start: "09:00", end: "11:30", room: "Lab 5" },
+    { name: "Praktikum Pemrograman Web", code: "CS3604P", lect: "Pak Andi Prasetyo",   jenis: "praktikum", kelas: "B1", day: "Sabtu",  start: "13:00", end: "15:30", room: "Lab 2" },
+    { name: "Praktikum Pemrograman Web", code: "CS3604P", lect: "Pak Andi Prasetyo",   jenis: "praktikum", kelas: "B2", day: "Sabtu",  start: "13:00", end: "15:30", room: "Lab 5" },
+    { name: "Kecerdasan Buatan", code: "CS4401", lect: "Dr. Hendra Wijaya", day: "Kamis",  jenis: "teori",     kelas: "AA", start: "15:00", end: "16:40", room: "Lab 1" },
+    { name: "Struktur Data",    code: "CS2201", lect: "Dr. Siti Nurhaliza",  day: "Kamis",  jenis: "teori",     kelas: "AA", start: "07:30", end: "09:10", room: "R. 301" },
+  ];
+  const WA_GROUPS = [ // dummy hasil "tarik grup" WAHA
+    { id: "1203630abc1", name: "Kelas A1",         members: 42 },
+    { id: "1203630abc2", name: "Kelas A2",         members: 40 },
+    { id: "1203630abc3", name: "Kelas B1",         members: 38 },
+    { id: "1203630abc4", name: "Kelas B2",         members: 36 },
+    { id: "1203630abc5", name: "Praktikum A1",      members: 21 },
+    { id: "1203630abc6", name: "Praktikum A2",      members: 20 },
+    { id: "1203630abc7", name: "Praktikum B1",      members: 19 },
+    { id: "1203630abc8", name: "Praktikum B2",      members: 18 },
+    { id: "1203630abc9", name: "Informatika 2022",  members: 83 },
+  ];
+  const KELAS_TARGETS = ["A1", "A2", "B1", "B2"];
+  let grpMap = {}; // kelas -> grup id
+
+  function initialsOf(name) {
+    return name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  }
+
+  function renderMhs(q) {
+    const list = $("mhsList");
+    const f = students.filter((s) =>
+      !q || s.name.toLowerCase().includes(q) || s.niu.includes(q));
+    list.innerHTML = f.length ? "" : '<p class="mini-note" style="padding: 12px 0; text-align: center;">Tidak ada hasil.</p>';
+    for (const s of f) {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "row-card";
+      row.style.cssText = "width: 100%; text-align: left; background: none;";
+      row.innerHTML =
+        '<span class="row-ava">' + initialsOf(s.name) + "</span>" +
+        '<span class="row-tx"><b>' + s.name + '</b><span>NIU ' + s.niu + " · Kelas " + s.kelas + "</span></span>" +
+        '<span class="chip-role' + (s.role !== "student" ? " pj" : "") + '">' + (ROLE_LABEL[s.role] || "Mahasiswa") + "</span>";
+      row.addEventListener("click", () => sheetMhs(s));
+      list.appendChild(row);
+    }
+  }
+
+    const dots = (t) => (t || "").replace(":", "."); // "09:20" → "09.20" tampilan lokal
+
+  const kelasOptsFor = (jenis, sel) =>
+    (jenis === "praktikum" ? KELAS_PRAK : KELAS_TEORI).map((k) =>
+      '<option value="' + k + '"' + (sel === k ? " selected" : "") + ">Kelas " + k + "</option>").join("");
+
+  buildWeek(); // mapels sudah dideklarasi → aman dari TDZ
+
+  function renderMapel() {
+    const list = $("mapelList");
+    list.innerHTML = "";
+    for (const m of mapels) {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "row-card";
+      row.style.cssText = "width: 100%; text-align: left; background: none;";
+      row.innerHTML =
+        '<span class="row-ava"><i class="ph ph-' + (m.jenis === "praktikum" ? "flask" : "book-open") + '" style="font-size: 19px;"></i></span>' +
+        '<span class="row-tx"><b>' + esc(m.name) + ' <span class="chip-role' + (m.jenis === "praktikum" ? " pj" : "") + '">' + esc(m.kelas) + "</span></b>" +
+        "<span>" + esc(m.code) + " · " + esc(m.day) + " " + dots(m.start) + "-" + dots(m.end) + " · " + esc(m.room) + "</span></span>";
+      row.addEventListener("click", () => sheetMapel(m));
+      list.appendChild(row);
+    }
+  }
+
+  /* ---- Sheet form generik ---- */
+  function openAdmSheet(html) {
+    $("admForm").innerHTML = html;
+    $("scrimAdm").classList.add("open");
+    $("sheetAdm").classList.add("open");
+    document.body.classList.add("locked");
+  }
+  function closeAdmSheet() {
+    $("scrimAdm").classList.remove("open");
+    $("sheetAdm").classList.remove("open");
+    if (!document.querySelector(".panel.open")) document.body.classList.remove("locked");
+  }
+  $("scrimAdm").addEventListener("click", closeAdmSheet);
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  function sheetMhs(s) {
+    const isNew = !s;
+    s = s || { name: "", niu: "", kelas: "A", role: "student" };
+    openAdmSheet(
+      '<h3>' + (isNew ? "Tambah mahasiswa" : esc(s.name)) + "</h3>" +
+      '<div class="f-group"><label>Nama</label><input id="fNama" type="text" value="' + esc(s.name) + '" placeholder="Nama lengkap" /></div>' +
+      '<div class="f-group"><label>NIU</label><input id="fNiu" type="text" inputmode="numeric" value="' + esc(s.niu) + '" placeholder="22105100xx" /></div>' +
+      '<div class="f-group"><label>Kelas</label><select id="fKelas">' + KELAS_LIST.map((k) => '<option value="' + k + '"' + (s.kelas === k ? " selected" : "") + ">Kelas " + k + "</option>").join("") + "</select></div>" +
+      '<div class="f-group"><label>Role</label><select id="fRole"><option value="student"' + (s.role === "student" ? " selected" : "") + '>Mahasiswa</option><option value="pj"' + (s.role === "pj" ? " selected" : "") + '>PJ Matkul</option><option value="admin"' + (s.role === "admin" ? " selected" : "") + '>Ketua Kelas</option></select></div>' +
+      '<button type="button" class="btn-accent" id="fSave">' + (isNew ? "Tambah" : "Simpan") + "</button>" +
+      (isNew ? '<button type="button" class="btn-ghost" id="fCancel">Batal</button>'
+             : '<button type="button" class="btn-danger" id="fDel">Hapus</button><button type="button" class="btn-ghost" id="fCancel">Batal</button>')
+    );
+    $("fSave").addEventListener("click", () => {
+      const name = $("fNama").value.trim(), niu = $("fNiu").value.trim();
+      if (!name || niu.length < 6) { showToast("Nama dan NIU wajib diisi"); return; }
+      if (isNew) students.push({ name, niu, kelas: $("fKelas").value, role: $("fRole").value });
+      else { s.name = name; s.niu = niu; s.kelas = $("fKelas").value; s.role = $("fRole").value; }
+      closeAdmSheet(); renderMhs($("admQ").value.trim().toLowerCase()); showToast(isNew ? "Mahasiswa ditambahkan" : "Perubahan disimpan");
+    });
+    const del = $("fDel");
+    if (del) del.addEventListener("click", () => {
+      const i = students.indexOf(s);
+      if (i > -1) students.splice(i, 1);
+      closeAdmSheet(); renderMhs(""); showToast("Mahasiswa dihapus");
+    });
+    $("fCancel").addEventListener("click", closeAdmSheet);
+  }
+
+  function sheetMapel(m) {
+    const isNew = !m;
+    m = m || { name: "", code: "", lect: "", jenis: "teori", kelas: "AA", day: "Senin", start: "", end: "", room: "" };
+    const dayOpts = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    openAdmSheet(
+      '<h3>' + (isNew ? "Tambah matkul" : esc(m.name)) + "</h3>" +
+      '<div class="f-group"><label>Nama matkul</label><input id="fNama" type="text" value="' + esc(m.name) + '" placeholder="cth: Pemrograman Web" /></div>' +
+      '<div class="f-group"><label>Kode</label><input id="fCode" type="text" value="' + esc(m.code) + '" placeholder="CS3604" /></div>' +
+      '<div class="f-group"><label>Dosen pengampu</label><input id="fLect" type="text" value="' + esc(m.lect) + '" placeholder="Nama dosen" /></div>' +
+      '<div class="f-group"><label>Jenis</label><select id="fJenis"><option value="teori"' + (m.jenis !== "praktikum" ? " selected" : "") + '>Teori</option><option value="praktikum"' + (m.jenis === "praktikum" ? " selected" : "") + '>Praktikum</option></select></div>' +
+      '<div class="f-group"><label>Kelas</label><select id="fKelasMapel">' + kelasOptsFor(m.jenis, m.kelas) + '</select><span class="mini-note">Teori: AA / BB · Praktikum: A1, A2, B1, B2</span></div>' +
+      '<div class="f-group"><label>Hari</label><select id="fDay">' + dayOpts.map((d) => '<option value="' + d + '"' + (m.day === d ? " selected" : "") + ">" + d + "</option>").join("") + "</select></div>" +
+      '<div class="f-grid2">' +
+        '<div class="f-group"><label>Mulai</label><input id="fStart" type="time" value="' + esc(m.start) + '" /></div>' +
+        '<div class="f-group"><label>Selesai</label><input id="fEnd" type="time" value="' + esc(m.end) + '" /></div>' +
+      "</div>" +
+      '<div class="f-group"><label>Ruang / Lab</label><input id="fRoom" type="text" value="' + esc(m.room) + '" placeholder="R. 205 atau Lab 2" /></div>' +
+      '<button type="button" class="btn-accent" id="fSave">' + (isNew ? "Tambah" : "Simpan") + "</button>" +
+      (!isNew ? '<button type="button" class="btn-ghost" id="fOnline"><i class="ph-bold ph-video-camera"></i>&nbsp; Jadikan daring hari ini</button>' : "") +
+      (isNew ? '<button type="button" class="btn-ghost" id="fCancel">Batal</button>'
+             : '<button type="button" class="btn-danger" id="fDel">Hapus</button><button type="button" class="btn-ghost" id="fCancel">Batal</button>')
+    );
+    // jenis berganti → daftar kelas ikut (teori: AA/BB, praktikum: A1-B2)
+    $("fJenis").addEventListener("change", () => { $("fKelasMapel").innerHTML = kelasOptsFor($("fJenis").value, null); });
+    $("fSave").addEventListener("click", () => {
+      const name = $("fNama").value.trim();
+      if (!name) { showToast("Nama matkul wajib diisi"); return; }
+      if ($("fStart").value >= $("fEnd").value) { showToast("Jam selesai harus setelah mulai"); return; }
+      const data = { name, code: $("fCode").value.trim(), lect: $("fLect").value.trim(), jenis: $("fJenis").value, kelas: $("fKelasMapel").value, day: $("fDay").value, start: $("fStart").value, end: $("fEnd").value, room: $("fRoom").value.trim() };
+      if (isNew) mapels.push(data); else Object.assign(m, data);
+      closeAdmSheet(); renderMapel(); buildWeek();
+      if (!$("view-jadwal").hidden) renderJadwal(true);
+      showToast(isNew ? "Matkul ditambahkan" : "Perubahan disimpan");
+    });
+    const del = $("fDel");
+    if (del) del.addEventListener("click", () => {
+      const i = mapels.indexOf(m);
+      if (i > -1) mapels.splice(i, 1);
+      closeAdmSheet(); renderMapel(); buildWeek();
+      if (!$("view-jadwal").hidden) renderJadwal(true);
+      showToast("Matkul dihapus");
+    });
+    const onl = $("fOnline");
+    if (onl) onl.addEventListener("click", () => sheetDaring(m));
+    $("fCancel").addEventListener("click", closeAdmSheet);
+  }
+
+  // Sheet 2: jadikan matkul daring untuk hari yang sedang dilihat di Jadwal (H-infinity, bukan hanya hari ini).
+  // Tidak mengubah jadwal tetap — override one-shot per tanggal.
+  function sheetDaring(m, key) {
+    key = key || todayKey;
+    const ov = overrides.find((o) => o.date === key && ovKey(o) === ovKey(m));
+    const dayLabel = key === todayKey ? "hari ini" : new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "numeric", month: "long" }).format(new Date(key + "T00:00:00"));
+    openAdmSheet(
+      '<h3>' + esc(m.name) + " · kelas " + esc(m.kelas) + " · daring " + dayLabel + "</h3>" +
+      '<p class="note" style="margin: 0 0 12px;">Berlaku hanya untuk ' + dayLabel + " · kelas " + esc(m.kelas) + ". Mahasiswa akan menerima notifikasi.</p>" +
+      '<div class="f-group"><label>Platform</label><select id="fPlat"><option>Google Meet</option><option>Zoom</option></select></div>' +
+      '<div class="f-group"><label>Link kelas</label><input id="fLink" type="url" value="' + esc(ov ? ov.link : "") + '" placeholder="https://meet.google.com/…" /></div>' +
+      '<button type="button" class="btn-accent" id="fGo"><i class="ph-fill ph-paper-plane-tilt"></i>&nbsp; Simpan</button>' +
+      '<button type="button" class="btn-ghost" id="fBack">Kembali</button>' +
+      '<button type="button" class="btn-ghost" id="fCancel">Tutup</button>'
+    );
+    if (ov) $("fPlat").value = ov.platform;
+    $("fGo").addEventListener("click", () => {
+      const link = $("fLink").value.trim();
+      if (!/^https?:\/\/.+/.test(link)) { showToast("Link kelas wajib diisi (http/https)"); return; }
+      overrides = overrides.filter((o) => !(o.date === key && ovKey(o) === ovKey(m)));
+      overrides.push({ date: key, name: m.name, kelas: m.kelas, platform: $("fPlat").value, link, by: ROLE === "admin" ? "Admin" : "Ketua Kelas", at: new Date().toTimeString().slice(0, 5) });
+      refreshOv();
+      showToast(key === todayKey ? "Pengumuman terkirim · jadwal diperbarui" : "Pengumuman terkirim · berlaku " + dayLabel);
+      vib(10);
+    });
+    $("fBack").addEventListener("click", sheetOverrides); // kembali ke list
+    $("fCancel").addEventListener("click", closeAdmSheet);
+  }
+
+  // reset semua tampilan setelah overrides berubah
+  function refreshOv() {
+    closeAdmSheet();
+    courses.length = 0; courses.push(...(week[DAY_IDX] || []).filter(mine).map(applyOverride));
+    renderNotif();
+    tick();
+    if (!$("view-jadwal").hidden) renderJadwal(true);
+  }
+
+  // Sheet (menu Jadwal): ubah jadwal hari ini — pilih matkul dari jadwal hari ini, atur, simpan.
+  // Baris yang sudah daring tampil status + bisa dibatalkan langsung dari list.
+  function sheetOverrides() {
+    const key = dateKeyOf(jdDay); // ikut chip hari yang sedang dilihat di Jadwal
+    const ovOf = (c) => overrides.find((o) => o.date === key && ovKey(o) === ovKey(c));
+    const dayLabel = key === todayKey ? "hari ini" : new Intl.DateTimeFormat("id-ID", { weekday: "long" }).format(new Date(key + "T00:00:00"));
+    openAdmSheet(
+      '<h3>Ubah jadwal ' + dayLabel + "</h3>" +
+      '<p class="note" style="margin: 0 0 12px;">Pilih mata kuliah ' + (key === todayKey ? "untuk dijadikan daring dadakan. Berlaku hari ini saja." : "di hari " + dayLabel + " untuk dijadikan daring. Berlaku pada hari tersebut saja.") + "</p>" +
+      (week[jdDay] || []).filter(mine).map((c) => {
+        const o = ovOf(c);
+        return (
+          '<div class="set-row ov-row" data-name="' + esc(c.name) + '" data-kelas="' + esc(c.kelas) + '">' +
+            '<div class="sx"><b>' + esc(c.name) + ' <span class="kbadge">' + esc(c.kelas) + "</span>" + (o ? ' <span class="badge online">Daring</span>' : "") + "</b>" +
+            "<span>" + esc(c.jam || fmt(c.start) + " - " + fmt(c.end)) + " · " + esc(c.room) + "</span></div>" +
+            (o
+              ? '<button type="button" class="btn-ghost ov-open" data-link="' + esc(o.link) + '">Buka</button>' +
+                '<button type="button" class="btn-danger ov-del">Batalkan</button>'
+              : '<button type="button" class="btn-ghost ov-pick">Daring</button>') +
+          "</div>"
+        );
+      }).join("") +
+      '<button type="button" class="btn-ghost" id="fCancel">Tutup</button>'
+    );
+    $("sheetAdm").querySelectorAll(".ov-pick").forEach((b) => {
+      const r = b.closest(".ov-row");
+      b.addEventListener("click", () => sheetDaring(courseByName(r.dataset.name, jdDay, r.dataset.kelas), key));
+    });
+    $("sheetAdm").querySelectorAll(".ov-open").forEach((b) =>
+      b.addEventListener("click", () => window.open(b.dataset.link, "_blank", "noopener")));
+    $("sheetAdm").querySelectorAll(".ov-del").forEach((b) =>
+      b.addEventListener("click", () => {
+        const row = b.closest(".ov-row");
+        const nm = row.dataset.name, kl = row.dataset.kelas;
+        overrides = overrides.filter((o) => !(o.date === key && o.name === nm && o.kelas === kl));
+        row.remove();
+        courses.length = 0; courses.push(...(week[DAY_IDX] || []).filter(mine).map(applyOverride));
+        renderNotif();
+        tick();
+        if (!$("view-jadwal").hidden) renderJadwal(true);
+        showToast(nm + " · kelas " + kl + " kembali tatap muka");
+        vib(10);
+      }));
+    $("fCancel").addEventListener("click", closeAdmSheet);
+  }
+
+  // matkul berdasar nama+kelas (di hari yang dilihat — week = jadwal asli, sebelum override)
+  function courseByName(nm, day = jdDay, kelas) { return (week[day] || []).find((c) => c.name === nm && (kelas === undefined || c.kelas === kelas)); }
+
+  $("btnAddMhs").addEventListener("click", () => sheetMhs(null));
+  $("btnAddMapel").addEventListener("click", () => sheetMapel(null));
+  $("admQ").addEventListener("input", (e) => renderMhs(e.target.value.trim().toLowerCase()));
+
+  /* ---- Segmented Kelola ---- */
+  let kelTab = "mhs";
+  $("segKelola").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-k]");
+    if (!b || b.dataset.k === kelTab) return;
+    kelTab = b.dataset.k;
+    [...$("segKelola").children].forEach((c) => c.classList.toggle("sel", c === b));
+    $("kel-mhs").hidden = kelTab !== "mhs";
+    $("kel-mapel").hidden = kelTab !== "mapel";
+    $("kel-bot").hidden = kelTab !== "bot";
+    vib(6);
+  });
+
+  /* ---- Bot WA (mock WAHA) ---- */
+  let botOn = false;
+  function setBot(dotCls, title, sub) {
+    $("botDot").className = "bot-dot " + dotCls;
+    $("botStatTitle").textContent = title;
+    $("botStatSub").textContent = sub;
+  }
+  $("btnConnect").addEventListener("click", () => {
+    const ep = $("botEndpoint").value.trim(), ss = $("botSession").value.trim();
+    if (!ep || !ss) { showToast("Endpoint dan nama session wajib diisi"); return; }
+    setBot("warn", "Menghubungkan…", "Menghubungi " + ep);
+    $("btnConnect").textContent = "Menghubungkan…";
+    setTimeout(() => {
+      botOn = true;
+      setBot("ok", "Terhubung", "Session “" + ss + "” · " + WA_GROUPS.length + " grup ditemukan");
+      $("btnConnect").textContent = "Tarik ulang grup";
+      renderGroups();
+      $("grpWrap").hidden = false;
+      vib(10);
+      showToast("Bot WA terhubung");
+    }, 1400);
+  });
+  function renderGroups() {
+    const list = $("grpList");
+    list.innerHTML = "";
+    for (const k of KELAS_TARGETS) {
+      const row = document.createElement("div");
+      row.className = "grp-row";
+      const opts = '<option value="">— pilih grup —</option>' + WA_GROUPS.map((g) =>
+        '<option value="' + g.id + '"' + (grpMap[k] === g.id ? " selected" : "") + ">" + esc(g.name) + " (" + g.members + ")</option>").join("");
+      row.innerHTML =
+        '<span class="grp-tx"><b>Kelas ' + k + '</b><span id="gmap-' + k.toLowerCase() + '">' +
+        (grpMap[k] ? "Grup dipilih" : "Belum dipetakan") + "</span></span>" +
+        '<select data-kelas="' + k + '">' + opts + "</select>";
+      row.querySelector("select").addEventListener("change", (e) => {
+        grpMap[k] = e.target.value;
+        updateGrpLabels();
+        vib(6);
+      });
+      list.appendChild(row);
+    }
+  }
+  function updateGrpLabels() {
+    for (const k of KELAS_TARGETS) {
+      const el = $("gmap-" + k.toLowerCase());
+      if (el) el.textContent = grpMap[k] ? "Grup dipilih" : "Belum dipetakan";
+    }
+  }
+  bindSwitch("swTrgJadwal", "sk-trg-jadwal", true);
+  bindSwitch("swTrgTugas", "sk-trg-tugas", true);
+  bindSwitch("swTrgInfo", "sk-trg-info", false);
+
+  function renderKelola() {
+    renderMhs($("admQ").value.trim().toLowerCase());
+    renderMapel();
+  }
+  $("btnKelola").addEventListener("click", () => { openPanel("panel-kelola"); renderKelola(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("sheetAdm").classList.contains("open")) closeAdmSheet(); });
+
+  function tick() {
+    const n = t();
+    renderGreeting(n);
+    renderLive(n);
+    renderTasks(n);
+    renderList(n);
+    if (!$("view-jadwal").hidden) renderJadwal(false);
+    if (!$("view-tugas").hidden) renderTugas(n);
+  }
+  tick();
+  if (!demoT) setInterval(tick, 30000);

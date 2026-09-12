@@ -1,0 +1,226 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+/* Class-based dark mode (Tailwind v4) — toggled via .dark on <html> */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+|--------------------------------------------------------------------------
+| Design Tokens — "Portal Night Glass" (Full Rombak 2026)
+| Identitas: Indigo deep + glass surfaces + floating dock.
+| Warna semantik status (PRD §8.1) tetap dipertahankan.
+|--------------------------------------------------------------------------
+*/
+@theme inline {
+    --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+
+    /* Brand — Indigo scale (PRD: Blue/Indigo primary) */
+    --color-primary-50: #eef2ff;
+    --color-primary-100: #e0e7ff;
+    --color-primary-200: #c7d2fe;
+    --color-primary-300: #a5b4fc;
+    --color-primary-400: #818cf8;
+    --color-primary-500: #6366f1;
+    --color-primary-600: #4f46e5;
+    --color-primary-700: #4338ca;
+    --color-primary-800: #3730a3;
+    --color-primary-900: #312e81;
+
+    /* Semantic surfaces */
+    --color-surface: var(--surface);
+    --color-card: var(--card);
+    --color-elevated: var(--elevated);
+    --color-overlay: var(--overlay);
+    --color-line: var(--line);
+    --color-line-soft: var(--line-soft);
+
+    /* Semantic text */
+    --color-ink: var(--ink);
+    --color-ink-soft: var(--ink-soft);
+    --color-ink-faint: var(--ink-faint);
+
+    /* Status accents — Online Meeting Purple 600 */
+    --color-online: #7c3aed;
+    --color-online-bg: var(--online-bg);
+    --color-online-line: var(--online-line);
+
+    /* Reschedule / Warning Amber 500 */
+    --color-rescheduled: #d97706;
+    --color-rescheduled-bg: var(--rescheduled-bg);
+    --color-rescheduled-line: var(--rescheduled-line);
+
+    /* Danger / Urgent Rose 600 */
+    --color-cancelled: #e11d48;
+    --color-cancelled-bg: var(--cancelled-bg);
+    --color-cancelled-line: var(--cancelled-line);
+
+    /* Success Emerald 600 */
+    --color-safe: #059669;
+    --color-safe-bg: var(--safe-bg);
+    --color-safe-line: var(--safe-line);
+
+    /* Elevation — softer, more refined */
+    --shadow-card: 0 1px 3px 0 rgb(15 23 42 / 0.04), 0 4px 16px -6px rgb(49 46 129 / 0.08);
+    --shadow-card-hover: 0 2px 6px -1px rgb(15 23 42 / 0.06), 0 12px 32px -12px rgb(49 46 129 / 0.15);
+    --shadow-btn: 0 4px 12px -4px rgb(79 70 229 / 0.40);
+    --shadow-modal: 0 24px 80px -16px rgb(2 6 23 / 0.45), 0 0 0 1px rgb(255 255 255 / 0.04) inset;
+    --shadow-dock: 0 -1px 0 rgb(0 0 0 / 0.03), 0 8px 32px -4px rgb(15 23 42 / 0.18), 0 2px 6px rgb(15 23 42 / 0.06);
+
+    --animate-fade-in-up: fade-in-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+    --animate-scale-in: scale-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+    --animate-blob: blob 14s ease-in-out infinite alternate;
+
+    @keyframes fade-in-up {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes scale-in {
+        from {
+            opacity: 0;
+            transform: scale(0.96) translateY(8px);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+    }
+
+    @keyframes blob {
+        0% {
+            transform: translate(0, 0) scale(1);
+        }
+        50% {
+            transform: translate(24px, -16px) scale(1.08);
+        }
+        100% {
+            transform: translate(-16px, 12px) scale(0.96);
+        }
+    }
+}
+
+/* Light theme values — cool paper base */
+:root {
+    --surface: #f2f5fb;
+    --card: #ffffff;
+    --elevated: #edf1f9;
+    --overlay: rgb(15 23 42 / 0.50);
+    --line: #e2e8f2;
+    --line-soft: #eceff7;
+    --ink: #101828;
+    --ink-soft: #64748b;
+    --ink-faint: #98a2b3;
+
+    --online-bg: #f5f3ff;
+    --online-line: #ddd6fe;
+    --rescheduled-bg: #fffbeb;
+    --rescheduled-line: #fde68a;
+    --cancelled-bg: #fff1f2;
+    --cancelled-line: #fecdd3;
+    --safe-bg: #ecfdf5;
+    --safe-line: #a7f3d0;
+
+    color-scheme: light;
+}
+
+/* Dark theme values — deep night glass */
+.dark {
+    --surface: #060913;
+    --card: #0d1424;
+    --elevated: #151d31;
+    --overlay: rgb(2 6 23 / 0.75);
+    --line: #233052;
+    --line-soft: #182136;
+    --ink: #eef2f9;
+    --ink-soft: #94a3b8;
+    --ink-faint: #64748b;
+
+    --online-bg: #211a38;
+    --online-line: #3d2d66;
+    --rescheduled-bg: #2a2010;
+    --rescheduled-line: #55401a;
+    --cancelled-bg: #33111a;
+    --cancelled-line: #5c2030;
+    --safe-bg: #07271e;
+    --safe-line: #14503c;
+
+    color-scheme: dark;
+}
+
+@layer base {
+    button:not(:disabled),
+    [role="button"]:not(:disabled) {
+        cursor: pointer;
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--color-primary-500);
+        outline-offset: 2px;
+        border-radius: 0.5rem;
+    }
+
+    ::selection {
+        background-color: var(--color-primary-600);
+        color: #ffffff;
+    }
+
+    /* Subtle themed scrollbars */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: var(--line) transparent;
+    }
+
+    html {
+        -webkit-tap-highlight-color: transparent;
+        /* Smooth scroll global — berlaku untuk anchor, scrollTo, & reset scroll Inertia */
+        scroll-behavior: smooth;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        html {
+            scroll-behavior: auto !important;
+        }
+
+        *,
+        ::before,
+        ::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
+}
+
+/* Safe-area support for PWA bottom nav on notched devices */
+@utility pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Small assignment chip used on Admin → WAHA group list */
+@utility assign-btn {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.5rem;
+    font-size: 10px;
+    font-weight: 700;
+    transition: background-color .15s ease;
+}
+
+/* Scrollbar halus untuk panel scrollable (modal, list admin) */
+@utility scroll-smooth-panel {
+    scroll-behavior: smooth;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
